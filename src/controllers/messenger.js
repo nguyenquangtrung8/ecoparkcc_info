@@ -5,8 +5,11 @@ const { isOperatingHours } = require('../utils/time');
 class MessengerController {
   static async handleMessage(sender_psid, message) {
     try {
+      console.log('Handling message:', message); // Debug log
+
       // Kiểm tra giờ hoạt động
       if (!isOperatingHours()) {
+        console.log('Outside operating hours'); // Debug log
         await MessengerService.sendMessage(sender_psid, {
           text: "⏰ Xin lỗi, hệ thống chỉ hoạt động từ 6h-22h. Vui lòng quay lại sau!"
         });
@@ -16,26 +19,32 @@ class MessengerController {
       // Xử lý tin nhắn
       if (message.text) {
         const userMessage = message.text.trim().toUpperCase();
+        console.log('Processing message:', userMessage); // Debug log
         
-        // Kiểm tra xem có phải mã căn hộ không
+        // Check apartment code pattern
         if (/^[A-Z]+\d+.*$/.test(userMessage)) {
+          console.log('Valid apartment code format, searching...'); // Debug log
           const apartmentInfo = await ApartmentService.findByCode(userMessage);
+          
           if (apartmentInfo) {
+            console.log('Apartment found:', apartmentInfo); // Debug log
             const response = MessengerService.formatApartmentResponse(apartmentInfo);
             await MessengerService.sendMessage(sender_psid, response);
           } else {
+            console.log('Apartment not found'); // Debug log
             await MessengerService.sendMessage(sender_psid, {
               text: "❌ Không tìm thấy thông tin căn hộ. Vui lòng kiểm tra lại mã căn hộ (VD: SP2803)"
             });
           }
         } else {
+          console.log('Invalid format, sending help message'); // Debug log
           await MessengerService.sendMessage(sender_psid, {
             text: "👋 Xin chào! Vui lòng nhập mã căn hộ để xem thông tin chi tiết (VD: SP2803)"
           });
         }
       }
     } catch (error) {
-      console.error('Error handling message:', error);
+      console.error('Error in handleMessage:', error); // Error log
       await MessengerService.sendMessage(sender_psid, {
         text: "🔧 Đã có lỗi xảy ra. Vui lòng thử lại sau."
       });
@@ -44,6 +53,7 @@ class MessengerController {
 
   static async handlePostback(sender_psid, postback) {
     try {
+      console.log('Handling postback:', postback); // Debug log
       let response;
       
       switch (postback.payload) {
@@ -79,9 +89,10 @@ class MessengerController {
           };
       }
       
+      console.log('Sending postback response:', response); // Debug log
       await MessengerService.sendMessage(sender_psid, response);
     } catch (error) {
-      console.error('Error handling postback:', error);
+      console.error('Error in handlePostback:', error); // Error log
       await MessengerService.sendMessage(sender_psid, {
         text: "🔧 Đã có lỗi xảy ra. Vui lòng thử lại sau."
       });
