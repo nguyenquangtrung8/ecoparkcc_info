@@ -21,27 +21,38 @@ router.get('/', (req, res) => {
 
 // Handle incoming messages
 router.post('/', async (req, res) => {
-  if (req.body.object === 'page') {
-    for (const entry of req.body.entry) {
-      for (const webhookEvent of entry.messaging) {
-        console.log('Webhook event:', webhookEvent);
-        
-        const sender_psid = webhookEvent.sender.id;
-        
-        try {
-          if (webhookEvent.message) {
-            await MessengerController.handleMessage(sender_psid, webhookEvent.message);
-          } else if (webhookEvent.postback) {
-            await MessengerController.handlePostback(sender_psid, webhookEvent.postback);
+  try {
+    console.log('Received webhook:', JSON.stringify(req.body, null, 2));
+
+    if (req.body.object === 'page') {
+      for (const entry of req.body.entry) {
+        // Check if entry.messaging exists and is an array
+        if (Array.isArray(entry.messaging)) {
+          for (const webhookEvent of entry.messaging) {
+            console.log('Processing event:', webhookEvent);
+            
+            const sender_psid = webhookEvent.sender.id;
+            
+            if (webhookEvent.message) {
+              console.log('Message data:', webhookEvent.message);
+              await MessengerController.handleMessage(sender_psid, webhookEvent.message);
+            } else if (webhookEvent.postback) {
+              console.log('Postback data:', webhookEvent.postback);
+              await MessengerController.handlePostback(sender_psid, webhookEvent.postback);
+            }
           }
-        } catch (error) {
-          console.error('Error handling webhook event:', error);
+        } else {
+          console.log('No messaging array in entry:', entry);
         }
       }
+      res.status(200).send('EVENT_RECEIVED');
+    } else {
+      console.log('Not a page object:', req.body.object);
+      res.sendStatus(404);
     }
-    res.status(200).send('EVENT_RECEIVED');
-  } else {
-    res.sendStatus(404);
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    res.sendStatus(500);
   }
 });
 
