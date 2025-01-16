@@ -29,38 +29,17 @@ app.use((req, res, next) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  const mongoStatus = ['disconnected', 'connected', 'connecting', 'disconnecting'];
-  
-  // Check connection status
-  const status = {
-    server: 'healthy',
+  res.json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    mongodb: {
-      status: mongoStatus[mongoose.connection.readyState],
-      connected: mongoose.connection.readyState === 1,
-      host: mongoose.connection.host,
-      name: mongoose.connection.name
-    },
-    system: {
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      node: process.version
-    }
-  };
-
-  // Send different status code if MongoDB is not connected
-  if (!status.mongodb.connected) {
-    res.status(503).json(status);
-  } else {
-    res.json(status);
-  }
+    environment: process.env.NODE_ENV
+  });
 });
 
 // Routes
 app.use('/webhook', messengerRoutes);
 
-// Global error handler
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   res.status(500).json({
@@ -70,33 +49,39 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  process.exit(1);
-});
-
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('Server closed.');
-    mongoose.connection.close(false, () => {
-      console.log('MongoDB connection closed.');
-      process.exit(0);
+const shutdown = async () => {
+  console.log('Shutting down gracefully...');
+  
+  try {
+    // Close server first
+    await new Promise(resolve => {
+      server.close(resolve);
     });
-  });
+    console.log('Server closed');
+
+    // Then close MongoDB connection
+    await mongoose.connection.close();
+    console.log('MongoDB connection closed');
+    
+    process.exit(0);
+  } catch (err) {
+    console.error('Error during shutdown:', err);
+    process.exit(1);
+  }
+};
+
+// Handle termination signals
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
 });
 
 module.exports = app;
